@@ -21,8 +21,6 @@
     .result{display:flex;flex-direction:column;gap:8px}
     .result .line{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--glass);border-radius:8px;border:1px solid rgba(255,255,255,0.02)}
     .muted{color:var(--muted);font-size:13px}
-    .hint{font-size:13px;color:var(--muted);margin-top:8px}
-    footer{margin-top:12px;color:var(--muted);font-size:13px;text-align:right}
     .subnets{margin-top:20px}
     .subnet-item{background:var(--glass);padding:10px;margin-top:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.02)}
     @media (max-width:760px){.grid{grid-template-columns:1fr}.row{flex-wrap:wrap}}
@@ -58,11 +56,10 @@
     </div>
 
     <div class="card subnets" id="subnets">
-      <h3>Subnet Lain dalam Jaringan yang Sama</h3>
+      <h3>Subnet Sebelumnya dan Berikutnya</h3>
       <div id="subnetList" class="muted">Belum ada perhitungan.</div>
     </div>
 
-    <footer>Validasi sederhana: format IP harus empat oktet dipisah titik.</footer>
   </div>
 
   <script>
@@ -77,7 +74,17 @@
 
     function showResult(res){if(res.error){maskEl.textContent=res.error;networkEl.textContent=broadcastEl.textContent=firstEl.textContent=lastEl.textContent=totalEl.textContent=usableEl.textContent='-';return;}maskEl.textContent=res.mask;networkEl.textContent=res.network+'/'+(prefixInput.value||'');broadcastEl.textContent=res.broadcast;firstEl.textContent=res.first;lastEl.textContent=res.last;totalEl.textContent=res.total;usableEl.textContent=res.usable;generateSubnets(res);}
 
-    function generateSubnets(res){const blockSize=res.raw.total;const netStart=res.raw.networkInt;let html='';for(let i=0;i<8;i++){const subNetStart=netStart+(i*blockSize);if(subNetStart>0xFFFFFFFF)break;const subNetEnd=subNetStart+blockSize-1;html+=`<div class='subnet-item'><strong>Subnet ${i+1}</strong><br>Network: ${intToIp(subNetStart)} / ${prefixInput.value}<br>Broadcast: ${intToIp(subNetEnd)}<br>Host range: ${intToIp(subNetStart+1)} - ${intToIp(subNetEnd-1)}</div>`;}subnetList.innerHTML=html||'Tidak ada subnet tambahan.';}
+    function generateSubnets(res){const blockSize=res.raw.total;const netStart=res.raw.networkInt;let html='';const subnets=[];
+      // 3 subnet sebelum
+      for(let i=3;i>0;i--){const start=netStart-(blockSize*i);if(start>=0){const end=start+blockSize-1;subnets.push({label:`Subnet -${i}`,network:start,broadcast:end});}}
+      // subnet utama
+      subnets.push({label:'Subnet Saat Ini',network:netStart,broadcast:netStart+blockSize-1});
+      // 8 subnet sesudah
+      for(let i=1;i<=8;i++){const start=netStart+(blockSize*i);if(start<=0xFFFFFFFF){const end=start+blockSize-1;if(end<=0xFFFFFFFF){subnets.push({label:`Subnet +${i}`,network:start,broadcast:end});}}}
+
+      if(subnets.length===0){subnetList.innerHTML='Tidak ada subnet tambahan.';return;}
+      subnets.forEach((s,idx)=>{html+=`<div class='subnet-item'><strong>${s.label}</strong><br>Network: ${intToIp(s.network)} / ${prefixInput.value}<br>Broadcast: ${intToIp(s.broadcast)}<br>Host range: ${intToIp(s.network+1)} - ${intToIp(s.broadcast-1)}</div>`;});
+      subnetList.innerHTML=html;}
 
     btn.addEventListener('click',()=>{const ip=ipInput.value.trim();const prefix=Number(prefixInput.value);const res=calculate(ip,prefix);showResult(res);});
     clearBtn.addEventListener('click',()=>{ipInput.value='';prefixInput.value='24';maskEl.textContent=networkEl.textContent=broadcastEl.textContent=firstEl.textContent=lastEl.textContent=totalEl.textContent=usableEl.textContent='—';subnetList.innerHTML='Belum ada perhitungan.';});
